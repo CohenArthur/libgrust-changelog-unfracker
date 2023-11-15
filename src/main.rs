@@ -123,8 +123,6 @@ impl Commit {
         let is_changelog_entry =
             changelog.map(|s| !(s.is_empty() || s.starts_with("Signed-off-by")));
 
-        dbg!(changelog, entries, &is_changelog_entry);
-
         is_changelog_entry.and_then(|b| {
             b.then(|| ChangelogEntry {
                 file: changelog.unwrap().split_once(':').unwrap().0.to_string(),
@@ -163,12 +161,17 @@ impl Commit {
         // there might not be a commit message
         let body = blocks.next().map(|s| Body(String::from(s)));
 
-        let entry = Commit::parse_changelog_entries(&mut blocks);
+        let changelog_entries = Commit::parse_changelog_entries(&mut blocks);
 
-        dbg!(title, body, entry);
-        dbg!(blocks);
+        // there might not be a SoB line
+        let sob = blocks.next().map(|s| SoB(String::from(s)));
 
-        todo!()
+        Commit {
+            title,
+            body,
+            changelog_entries,
+            sob,
+        }
     }
 }
 
@@ -185,4 +188,6 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let commit = Commit::parse(args.input);
+
+    dbg!(commit);
 }
