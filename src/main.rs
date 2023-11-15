@@ -58,15 +58,11 @@
 
 // if `lines` is empty in a "changelog entry" then we remove the entire entry
 
-use std::{
-    collections::HashSet,
-    env,
-    path::PathBuf,
-    process::{Command, Stdio},
-    str::Split,
-};
+use std::path::PathBuf;
 
 use clap::Parser;
+
+mod parser;
 
 #[derive(Debug)]
 struct ChangelogLine {
@@ -75,12 +71,57 @@ struct ChangelogLine {
 }
 // format as `\t* <file>: <message>\n`
 
+impl ChangelogLine {
+    fn is_libgrust_line(&self) -> bool {
+        self.file.starts_with("libgrust/") || self.file.starts_with("librust")
+    }
+
+    fn into_libgrust_line(self) -> ChangelogLine {
+        let file = self.file.strip_prefix("libgrust/").unwrap().to_owned();
+
+        ChangelogLine { file, ..self }
+    }
+}
+
 #[derive(Debug)]
 struct ChangelogEntry {
     file: String,              // PathBuf?
     lines: Vec<ChangelogLine>, // NonEmptyVec?
 }
 // format as `<file>:\n <lines>`
+
+impl ChangelogEntry {
+    fn split_in_libgrust_entry(self) -> (Option<ChangelogEntry>, Option<ChangelogEntry>) {
+        // split the lines based on `is_libgrust_line`
+        // if they are libgrust lines, fix them using `to_libgrust_line`
+        // put the first part in the original entry
+        // put the second part in a new entry
+
+        let entry_or_none = |file, lines: Vec<ChangelogLine>| {
+            if lines.is_empty() {
+                None
+            } else {
+                Some(ChangelogEntry { file, lines })
+            }
+        };
+
+        let (libgrust_lines, lines) = self
+            .lines
+            .into_iter()
+            .partition(ChangelogLine::is_libgrust_line);
+
+        (
+            entry_or_none(self.file, lines),
+            entry_or_none(
+                String::from("libgrust/Changelog"),
+                libgrust_lines
+                    .into_iter()
+                    .map(ChangelogLine::into_libgrust_line)
+                    .collect(),
+            ),
+        )
+    }
+}
 
 // first line of a commit
 #[derive(Debug)]
@@ -96,7 +137,7 @@ struct SoB(String);
 // format as `<0>`
 
 #[derive(Debug)]
-struct Commit {
+pub struct Commit {
     title: Title,
     body: Option<Body>,
     changelog_entries: Vec<ChangelogEntry>, // but cull away the empty ChangelogEntries,
@@ -104,73 +145,25 @@ struct Commit {
 }
 
 impl Commit {
-    fn parse_changelog_line(line: &str) -> ChangelogLine {
-        // \t* <file>: <msg>
-        let line = line.trim_start_matches(|c| c == '\t' || c == '*' || c == ' ');
+    fn unfrack_libgrust_entries(self) -> Commit {
+        let changelog_entries = self
+            .changelog_entries
+            .into_iter()
+            .map(|entry| entry.split_in_libgrust_entry())
+            .fold(Vec::new(), |mut acc, (entry, maybe_new_entry)| {
+                if let Some(e) = entry {
+                    acc.push(e)
+                }
+                if let Some(e) = maybe_new_entry {
+                    acc.push(e)
+                }
 
-        let (file, message) = line.split_once(':').unwrap();
-
-        let file = PathBuf::from(file);
-        let message = message.trim_start().to_string();
-
-        ChangelogLine { file, message }
-    }
-
-    fn maybe_parse_changelog_entry(blocks: &mut Split<'_, &str>) -> Option<ChangelogEntry> {
-        let changelog = blocks.next();
-        let entries = blocks.next();
-
-        let is_changelog_entry =
-            changelog.map(|s| !(s.is_empty() || s.starts_with("Signed-off-by")));
-
-        is_changelog_entry.and_then(|b| {
-            b.then(|| ChangelogEntry {
-                file: changelog.unwrap().split_once(':').unwrap().0.to_string(),
-                lines: entries
-                    .unwrap()
-                    .lines()
-                    .map(Commit::parse_changelog_line)
-                    .collect(),
-            })
-        })
-    }
-
-    fn parse_changelog_entries(blocks: &mut Split<'_, &str>) -> Vec<ChangelogEntry> {
-        let mut v = Vec::new();
-
-        while let Some(entry) = Commit::maybe_parse_changelog_entry(blocks) {
-            v.push(entry)
-        }
-
-        v
-    }
-
-    /// This does NOT return a Result - if this fails, our tool is in the wrong and should panic.
-    fn parse(input: String) -> Commit {
-        // title is until two newlines
-        // then message, until two newlines
-        // then Changelog entries
-
-        // we split the commit message in blocks separated by two newlines.
-        // the first one is the title, the second one is the commit message, and then are the Changelog entries
-        let mut blocks = input.split("\n\n");
-
-        // there's always a title, otherwise we panic
-        let title = blocks.next().map(|s| Title(String::from(s))).unwrap();
-
-        // there might not be a commit message
-        let body = blocks.next().map(|s| Body(String::from(s)));
-
-        let changelog_entries = Commit::parse_changelog_entries(&mut blocks);
-
-        // there might not be a SoB line
-        let sob = blocks.next().map(|s| SoB(String::from(s)));
+                acc
+            });
 
         Commit {
-            title,
-            body,
             changelog_entries,
-            sob,
+            ..self
         }
     }
 }
@@ -187,7 +180,8 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let commit = Commit::parse(args.input);
+    let commit = parser::commit(args.input);
 
-    dbg!(commit);
+    dbg!(&commit);
+    dbg!(commit.unfrack_libgrust_entries());
 }
