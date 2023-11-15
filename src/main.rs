@@ -58,7 +58,11 @@
 
 // if `lines` is empty in a "changelog entry" then we remove the entire entry
 
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::HashSet,
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 
 struct ChangelogLine {
     file: PathBuf,
@@ -92,8 +96,29 @@ struct Commit {
 impl Commit {
     /// This does NOT return a Result - if this fails, our tool is in the wrong and should panic.
     fn parse(input: String) -> Commit {
+        // title is until two newlines
+        // then message, until two newlines
+        // then Changelog entries
+
+        let blocks: Vec<&str> = input.split("\n\n").collect();
+
+        dbg!(blocks);
+
         todo!()
     }
 }
 
-fn main() {}
+fn main() {
+    // TODO: Should we take the commit's body message as argument?
+
+    let input = Command::new("git")
+        .arg("log")
+        .arg("-1")
+        .arg("--format=%B")
+        .stdout(Stdio::piped())
+        .output()
+        .unwrap();
+    // FIXME: No unwrap
+
+    let commit = Commit::parse(String::from_utf8(input.stdout).unwrap());
+}
