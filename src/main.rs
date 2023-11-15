@@ -62,6 +62,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+mod format;
 mod parser;
 
 #[derive(Debug)]
@@ -181,7 +182,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let commit = parser::commit(args.input);
+    let commit = commit.unfrack_libgrust_entries();
 
-    dbg!(&commit);
-    dbg!(commit.unfrack_libgrust_entries());
+    println!("{}", commit);
 }

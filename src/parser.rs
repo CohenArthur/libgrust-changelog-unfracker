@@ -15,6 +15,8 @@ fn changelog_line(line: &str) -> ChangelogLine {
 }
 
 fn maybe_changelog_entry(blocks: &mut Split<'_, &str>) -> Option<ChangelogEntry> {
+    // this consumes the SoB block if there is one, so that's not great. we need to do look-ahead
+    // in `changelog_entries` I guess?
     let changelog = blocks.next();
     let entries = blocks.next();
 
