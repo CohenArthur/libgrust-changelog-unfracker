@@ -120,7 +120,7 @@ impl ChangelogEntry {
         (
             entry_or_none(self.file, lines),
             entry_or_none(
-                String::from("libgrust/Changelog"),
+                String::from("libgrust/ChangeLog"),
                 libgrust_lines
                     .into_iter()
                     .map(ChangelogLine::into_libgrust_line)
