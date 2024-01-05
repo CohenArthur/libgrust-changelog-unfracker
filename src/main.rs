@@ -74,11 +74,17 @@ struct ChangelogLine {
 
 impl ChangelogLine {
     fn is_libgrust_line(&self) -> bool {
-        self.file.starts_with("libgrust/") || self.file.starts_with("librust")
+        self.file.starts_with("libgrust/") || self.file.starts_with("librust/")
     }
 
     fn into_libgrust_line(self) -> ChangelogLine {
-        let file = self.file.strip_prefix("libgrust/").unwrap().to_owned();
+        let file = self
+            .file
+            // FIXME: Ugly to try both like this?
+            .strip_prefix("libgrust/")
+            .or_else(|_| self.file.strip_prefix("librust/"))
+            .unwrap()
+            .to_owned();
 
         ChangelogLine { file, ..self }
     }
