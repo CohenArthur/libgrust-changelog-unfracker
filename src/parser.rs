@@ -2,6 +2,13 @@ use std::{path::PathBuf, str::Split};
 
 use crate::{Body, ChangelogEntry, ChangelogLine, Commit, SoB, Title};
 
+// FIXME: we can have more than one line per Changelog "line", e.g
+// ```
+// * libgrust/libproc_macro/file.cc:
+//   (LibProcMacro::SomeClass): New class.
+//   (LibProcMacro::some_function): New function.
+// ```
+// and the message is 3 lines long
 fn changelog_line(line: &str) -> ChangelogLine {
     // \t* <file>: <msg>
     let line = line.trim_start_matches(|c| c == '\t' || c == '*' || c == ' ');

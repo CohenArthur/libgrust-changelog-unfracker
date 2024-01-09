@@ -190,5 +190,5 @@ fn main() {
     let commit = parser::commit(args.input);
     let commit = commit.unfrack_libgrust_entries();
 
-    println!("{}", commit);
+    println!("{}", dbg!(commit));
 }
